@@ -50,13 +50,19 @@ int jpeg_draw_callback(JPEGDRAW* pDraw) {
 }
 
 #define TOOT_ID_LEN 20
+#define TOOT_AVATAR_PATH_LEN 128
 
-void display_avatar(const uint8_t* avatar_jpeg, int jpeg_len) {
+void display_avatar(const uint8_t* avatar_jpeg, int jpeg_len, bool booster) {
     if (jpeg_len > 0) {
         printf("Decoding JPEG length %d\n", jpeg_len);
         jpegdec.openRAM(avatar_jpeg, jpeg_len, &jpeg_draw_callback);
         jpegdec.setPixelType(RGB565_BIG_ENDIAN);
-        jpegdec.decode(0, 0, 0);
+        if (!booster) {
+            jpegdec.decode(0, 0, 0);
+        }
+        else {
+            jpegdec.decode(170, 170, JPEG_SCALE_QUARTER);
+        }
     }
 }
 
@@ -85,9 +91,17 @@ int main() {
             if (strcmp(last_toot_id, last_toot.id)) {
                 strcpy(last_toot_id, last_toot.id);
 
+                char booster_avatar_path[TOOT_AVATAR_PATH_LEN] = "";
+                if (last_toot.booster_avatar_path) strcpy(booster_avatar_path, last_toot.booster_avatar_path);
+
                 int len;
                 const uint8_t* jpeg_data = get_avatar_jpeg(last_toot.originator_avatar_path, &len);
-                display_avatar(jpeg_data, len);
+                display_avatar(jpeg_data, len, false);
+
+                if (last_toot.booster_avatar_path) {
+                    jpeg_data = get_avatar_jpeg(booster_avatar_path, &len);
+                    display_avatar(jpeg_data, len, true);
+                }
             }
         }
 
