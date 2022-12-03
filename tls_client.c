@@ -13,14 +13,13 @@
                                  "Host: %s\r\n" \
                                  "Connection: close\r\n" \
                                  "\r\n"
-#define TLS_CLIENT_HTTP_REQUEST_MAX_LEN 512
 #define TLS_CLIENT_TIMEOUT_SECS  15
 
 #define TLS_CLIENT_HTTP_RESPONSE_MAX_LEN 16384
 
 typedef struct TLS_CLIENT_T_ {
     struct altcp_pcb *pcb;
-    char req[TLS_CLIENT_HTTP_REQUEST_MAX_LEN];
+    char* req;
     char* rsp;
     int rsp_idx;
     int rsp_buf_len;
@@ -234,7 +233,6 @@ static bool dechunk(char* content_ptr, int* content_len) {
             int next_val = hex_to_int(*content_ptr++);
             if (next_val < 0) {
                 printf("Dechunk failed: non-hex value in chunk size\n");
-                printf("%.*s, %d", content_ptr - 3 - move_to, move_to, (int)content_ptr[-1]);
                 return false;
             }
             chunk_len += next_val;
@@ -254,13 +252,12 @@ static bool dechunk(char* content_ptr, int* content_len) {
             return false;
         }
 
-        // TODO: Make this not move the whole remaining data
-        memmove(move_to, content_ptr, *content_len - (content_ptr - original_start));
-        *content_len -= content_ptr - move_to;
+        memmove(move_to, content_ptr, chunk_len);
         move_to += chunk_len;
-        content_ptr = move_to + 2;
+        content_ptr += chunk_len + 2;
     }
 
+    *content_len = content_ptr - 2 - original_start;
     return true;
 }
 
@@ -276,7 +273,8 @@ int https_get(const char* hostname, const char* uri, char* buffer, int buf_len, 
     if (!state) {
         return -1;
     }
-    snprintf(state->req, TLS_CLIENT_HTTP_REQUEST_MAX_LEN, TLS_CLIENT_HTTP_REQUEST, uri, hostname);
+    state->req = buffer;
+    snprintf(state->req, buf_len, TLS_CLIENT_HTTP_REQUEST, uri, hostname);
     state->rsp = buffer;
     state->rsp_buf_len = buf_len;
     if (!tls_client_open(hostname, state)) {
@@ -290,8 +288,7 @@ int https_get(const char* hostname, const char* uri, char* buffer, int buf_len, 
         // main loop (not from a timer) to check for WiFi driver or lwIP work that needs to be done.
         cyw43_arch_poll();
 #endif
-        sleep_ms(50);
-        printf("%d\n", state->rsp_idx);
+        sleep_ms(1);
     }
 
     int rsp_len = state->rsp_idx;
