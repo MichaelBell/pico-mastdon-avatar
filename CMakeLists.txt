@@ -23,7 +23,7 @@ add_compile_options(-Wall
 
 # Add your source files
 add_executable(${NAME}
-    main.cpp st7789_lcd.c tls_client.c JPEGDEC.cpp json11.cpp # <-- Add source files here!
+    main.cpp mastodon.c st7789_lcd.c tls_client.c JPEGDEC.cpp cJSON.c # <-- Add source files here!
 )
 
 pico_generate_pio_header(${NAME} ${CMAKE_CURRENT_LIST_DIR}/st7789_lcd.pio)

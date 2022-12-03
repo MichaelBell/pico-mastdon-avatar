@@ -48,7 +48,7 @@ void JPEGDEC::setMaxOutputSize(int iMaxMCUs)
 //
 // Memory initialization
 //
-int JPEGDEC::openRAM(uint8_t *pData, int iDataSize, JPEG_DRAW_CALLBACK *pfnDraw)
+int JPEGDEC::openRAM(const uint8_t *pData, int iDataSize, JPEG_DRAW_CALLBACK *pfnDraw)
 {
     memset(&_jpeg, 0, sizeof(JPEGIMAGE));
     _jpeg.ucMemType = JPEG_MEM_RAM;
