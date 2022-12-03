@@ -5,4 +5,4 @@
 //             out parameter content_ptr specifies where the content begins.
 //             The headers are at the start of the buffer and are nul terminated.
 // On failure, returns a negative value.
-int https_get(const char* hostname, const char* uri, char* buffer, int buf_len, char** content_ptr);
+int https_get(const char* hostname, const char* uri, const char* headers, char* buffer, int buf_len, char** content_ptr);

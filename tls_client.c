@@ -11,6 +11,7 @@
 
 #define TLS_CLIENT_HTTP_REQUEST  "GET %s HTTP/1.1\r\n" \
                                  "Host: %s\r\n" \
+                                 "%s" \
                                  "Connection: close\r\n" \
                                  "\r\n"
 #define TLS_CLIENT_TIMEOUT_SECS  15
@@ -266,7 +267,7 @@ static bool dechunk(char* content_ptr, int* content_len) {
 // On success, returned value indicates the total length of received data,
 //             out parameter content_ptr specifies where the content begins.
 // On failure, returns a negative value.
-int https_get(const char* hostname, const char* uri, char* buffer, int buf_len, char** content_ptr) {
+int https_get(const char* hostname, const char* uri, const char* headers, char* buffer, int buf_len, char** content_ptr) {
     /* No CA certificate checking */
     tls_config = altcp_tls_create_config_client(NULL, 0);
 
@@ -275,7 +276,7 @@ int https_get(const char* hostname, const char* uri, char* buffer, int buf_len, 
         return -1;
     }
     state->req = buffer;
-    snprintf(state->req, buf_len, TLS_CLIENT_HTTP_REQUEST, uri, hostname);
+    snprintf(state->req, buf_len, TLS_CLIENT_HTTP_REQUEST, uri, hostname, headers ? headers : "");
     state->rsp = buffer;
     state->rsp_buf_len = buf_len;
     if (!tls_client_open(hostname, state)) {

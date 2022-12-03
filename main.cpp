@@ -30,7 +30,7 @@ bool connect_wifi() {
     cyw43_arch_enable_sta_mode();
 
     printf("Connecting to WiFi...\n");
-    if (cyw43_arch_wifi_connect_timeout_ms(wifi_ssid, wifi_pass, CYW43_AUTH_WPA2_AES_PSK, 30000)) {
+    if (cyw43_arch_wifi_connect_timeout_ms(WIFI_SSID, WIFI_PASSWORD, CYW43_AUTH_WPA2_AES_PSK, 30000)) {
         printf("failed to connect.\n");
         return false;
     } else {
@@ -51,6 +51,8 @@ int jpeg_draw_callback(JPEGDRAW* pDraw) {
     return 1;
 }
 
+#define AUTH_HEADER "Authorization: Bearer " MASTODON_TOKEN "\r\n"
+
 #define AVATAR_URI_MAX_LEN 128
 static char avatar_uri_buffer[AVATAR_URI_MAX_LEN] = "/small";
 
@@ -59,7 +61,7 @@ static char toot_id[TOOT_ID_LEN];
 
 const char* get_last_avatar_uri() {
     char* content_ptr;
-    int rsp_len = https_get("rebel-lion.uk", "/api/v1/timelines/public?limit=1", https_buffer, HTTPS_BUF_LEN, &content_ptr);
+    int rsp_len = https_get("rebel-lion.uk", "/api/v1/timelines/home?limit=1", AUTH_HEADER, https_buffer, HTTPS_BUF_LEN, &content_ptr);
     if (rsp_len <= 0) {
         printf("Couldn't fetch latest toot\n");
         return nullptr;
@@ -112,7 +114,7 @@ const char* get_last_avatar_uri() {
 void display_avatar(const char* avatar_uri) {
     printf("Fetching avatar at: %s\n", avatar_uri);
     char* content_ptr;
-    int rsp_len = https_get("rebel-lion.uk", avatar_uri, https_buffer, HTTPS_BUF_LEN, &content_ptr);
+    int rsp_len = https_get("rebel-lion.uk", avatar_uri, nullptr, https_buffer, HTTPS_BUF_LEN, &content_ptr);
     printf("https_get returned %d\n", rsp_len);
     if (rsp_len > 0) {
         printf("Received %d bytes.  Headers: \n%s\n", rsp_len, https_buffer);
