@@ -139,10 +139,11 @@ static void st7789_create_dma_channels(ST7789* st)
   st->ctrl_ctrl = dma_hw->ch[st->data_chan].ctrl_trig;
 }
 
-static void st7789_write_tcb(ST7789* st, const uint32_t* data_ptr, uint32_t word_count, bool repeat)
+static void st7789_write_tcb(ST7789* st, const uint32_t* data_ptr, uint32_t word_count, bool repeat, bool bswap)
 {
   uint ctrl = st->ctrl_ctrl;
   if (!repeat) ctrl |= DMA_CH0_CTRL_TRIG_INCR_READ_BITS;
+  if (bswap) ctrl |= DMA_CH0_CTRL_TRIG_BSWAP_BITS;
   if (word_count == 0) ctrl = 0;
 
   *st->ctrl_ptr++ = (uintptr_t)data_ptr;
@@ -187,12 +188,9 @@ void st7789_init(ST7789* st, PIO pio, uint sm, uint32_t* data_buf, uint32_t* ctr
     st7789_create_dma_channels(st);
 }
 
-void st7789_start_pixels_at(ST7789* st, uint8_t x, uint8_t y, uint8_t maxx, uint8_t maxy) {
+void st7789_start_pixels_at(ST7789* st, uint16_t x, uint16_t y, uint16_t maxx, uint16_t maxy) {
   y += ROW_OFFSET;
   maxy += ROW_OFFSET;
-
-  uint8_t ca_cmd[] = {0x2a, 0x00, x, 0x00, maxx};
-  uint8_t ra_cmd[] = {0x2b, 0x00, y, 0x00, maxy};
 
   uint32_t* data_ptr = st->data_ptr;
   *st->data_ptr++ = st7789_encode_cmd(0x2a, 4);
@@ -201,7 +199,7 @@ void st7789_start_pixels_at(ST7789* st, uint8_t x, uint8_t y, uint8_t maxx, uint
   *st->data_ptr++ = maxy | ((uint32_t)y << 16);
   *st->data_ptr++ = st7789_encode_cmd(0x2c, (uint32_t)(maxx - x + 1) * (uint32_t)(maxy - y + 1) * 2);
 
-  st7789_write_tcb(st, data_ptr, 5, false);
+  st7789_write_tcb(st, data_ptr, 5, false, false);
 }
 
 void st7789_trigger_transfer(ST7789* st)
@@ -211,7 +209,7 @@ void st7789_trigger_transfer(ST7789* st)
     st->transfer_in_progress = true;
 
     // Zero length TCB finishes the chain
-    st7789_write_tcb(st, NULL, 0, false);
+    st7789_write_tcb(st, NULL, 0, false, false);
 
     // Begin the transfer
     dma_channel_hw_addr(st->ctrl_chan)->read_addr = (uintptr_t)st->ctrl_buf;
@@ -242,10 +240,10 @@ void st7789_repeat_pixel(ST7789* st, uint16_t pixel, uint repeats)
   }
 
   *st->data_ptr = ((uint32_t)pixel << 16) | pixel;
-  st7789_write_tcb(st, st->data_ptr++, (repeats+1) >> 1, true);
+  st7789_write_tcb(st, st->data_ptr++, (repeats+1) >> 1, true, false);
 }
 
-void st7789_dma_pixel_data(ST7789* st, const uint32_t* pixels, uint len)
+void st7789_dma_pixel_data(ST7789* st, const uint32_t* pixels, uint len, bool bswap)
 {
-  st7789_write_tcb(st, pixels, len, false);
+  st7789_write_tcb(st, pixels, len, false, bswap);
 }

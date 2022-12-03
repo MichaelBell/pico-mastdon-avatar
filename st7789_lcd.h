@@ -17,7 +17,7 @@ typedef struct {
 void st7789_init(ST7789* st, PIO pio, uint sm, uint32_t* data_buf, uint32_t* ctrl_buf);
 
 // Queue data transfer into a given box
-void st7789_start_pixels_at(ST7789* st, uint8_t x, uint8_t y, uint8_t maxx, uint8_t maxy);
+void st7789_start_pixels_at(ST7789* st, uint16_t x, uint16_t y, uint16_t maxx, uint16_t maxy);
 
 // Write all queued data
 void st7789_trigger_transfer(ST7789* st);
@@ -29,4 +29,4 @@ void st7789_wait_for_transfer_complete(ST7789* st);
 void st7789_repeat_pixel(ST7789* st, uint16_t pixel, uint repeats);
 
 // Queue pixel data from memory, note len is data length in 32-bit words, not pixels.
-void st7789_dma_pixel_data(ST7789* st, const uint32_t* pixels, uint len);
+void st7789_dma_pixel_data(ST7789* st, const uint32_t* pixels, uint len, bool byte_swap);

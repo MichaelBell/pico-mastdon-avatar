@@ -13,7 +13,7 @@
                                  "Host: %s\r\n" \
                                  "Connection: close\r\n" \
                                  "\r\n"
-#define TLS_CLIENT_HTTP_REQUEST_MAX_LEN 360
+#define TLS_CLIENT_HTTP_REQUEST_MAX_LEN 512
 #define TLS_CLIENT_TIMEOUT_SECS  15
 
 #define TLS_CLIENT_HTTP_RESPONSE_MAX_LEN 16384
@@ -113,13 +113,13 @@ static err_t tls_client_recv(void *arg, struct altcp_pcb *pcb, struct pbuf *p, e
     }
 
     if (p->tot_len > 0) {
+        printf("%d bytes new data received from server, %d stored\n", p->tot_len, recv_len);
+
         if (recv_len > 0) {
             char* buf = state->rsp + state->rsp_idx;
             pbuf_copy_partial(p, buf, recv_len, 0);
             buf[recv_len] = 0;
             state->rsp_idx += recv_len;
-
-            printf("***\nnew data received from server:\n***\n\n%s\n", buf);
         }
 
         altcp_recved(pcb, p->tot_len);
@@ -213,6 +213,57 @@ static TLS_CLIENT_T* tls_client_init(void) {
     return state;
 }
 
+static int hex_to_int(char c) {
+    if (c < '0') return -1;
+    if (c <= '9') return c - '0';
+    if (c < 'A') return -1;
+    if (c <= 'F') return c - 'A' + 10;
+    if (c < 'a') return -1;
+    if (c <= 'f') return c - 'a' + 10;
+    return -1;
+}
+
+// Remove chunk encoding from HTTP content
+static bool dechunk(char* content_ptr, int* content_len) {
+    char* original_start = content_ptr;
+    char* move_to = content_ptr;
+    while (true) {
+        int chunk_len = 0;
+        while (*content_ptr != '\r') {
+            chunk_len <<= 4;
+            int next_val = hex_to_int(*content_ptr++);
+            if (next_val < 0) {
+                printf("Dechunk failed: non-hex value in chunk size\n");
+                printf("%.*s, %d", content_ptr - 3 - move_to, move_to, (int)content_ptr[-1]);
+                return false;
+            }
+            chunk_len += next_val;
+        }
+
+        if (content_ptr[1] != '\n') {
+            printf("Dechunk failed: Expected \\r\\n after chunk length\n");
+            return false;
+        }
+
+        if (chunk_len == 0) break;
+
+        printf("Remove chunk length %d\n", chunk_len);
+        content_ptr += 2;
+        if ((content_ptr + chunk_len) - original_start > *content_len) {
+            printf("Dechunk failed: Chunk exceeded content length\n");
+            return false;
+        }
+
+        // TODO: Make this not move the whole remaining data
+        memmove(move_to, content_ptr, *content_len - (content_ptr - original_start));
+        *content_len -= content_ptr - move_to;
+        move_to += chunk_len;
+        content_ptr = move_to + 2;
+    }
+
+    return true;
+}
+
 // Supplied buffer must be large enough for the HTTP response including the headers
 // On success, returned value indicates the total length of received data,
 //             out parameter content_ptr specifies where the content begins.
@@ -239,7 +290,8 @@ int https_get(const char* hostname, const char* uri, char* buffer, int buf_len, 
         // main loop (not from a timer) to check for WiFi driver or lwIP work that needs to be done.
         cyw43_arch_poll();
 #endif
-        sleep_ms(1);
+        sleep_ms(50);
+        printf("%d\n", state->rsp_idx);
     }
 
     int rsp_len = state->rsp_idx;
@@ -253,9 +305,19 @@ int https_get(const char* hostname, const char* uri, char* buffer, int buf_len, 
     // Content starts after two \r\ns
     *content_ptr = strstr(buffer, "\r\n\r\n");
     if (!*content_ptr) return -4;
+    (*content_ptr)[2] = 0;
+    *content_ptr += 4;
+
+    // Check headers for chunked encoding
+    int content_len = rsp_len - (*content_ptr - buffer);
+    if (strstr(buffer, "Transfer-Encoding: chunked\r\n")) {
+        if (!dechunk(*content_ptr, &content_len)) {
+            return -5;
+        }
+        rsp_len = (*content_ptr - buffer) + content_len;
+    }
 
     // Success!
-    *content_ptr += 4;
     return rsp_len;
 }
 

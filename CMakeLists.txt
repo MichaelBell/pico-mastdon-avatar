@@ -15,9 +15,15 @@ set(PICO_BOARD pico_w)
 # Initialize the SDK
 pico_sdk_init()
 
+add_compile_options(-Wall
+        -Wno-format
+        -Wno-unused-function
+        -Wno-maybe-uninitialized
+        )
+
 # Add your source files
 add_executable(${NAME}
-	main.cpp st7789_lcd.c tls_client.c # <-- Add source files here!
+    main.cpp st7789_lcd.c tls_client.c JPEGDEC.cpp # <-- Add source files here!
 )
 
 pico_generate_pio_header(${NAME} ${CMAKE_CURRENT_LIST_DIR}/st7789_lcd.pio)
