@@ -1,6 +1,7 @@
 #include "pico/stdlib.h"
 #include "pico/cyw43_arch.h"
 
+#include "json11.hpp"
 #include "JPEGDEC.h"
 
 #include "secrets.h"
@@ -50,6 +51,82 @@ int jpeg_draw_callback(JPEGDRAW* pDraw) {
     return 1;
 }
 
+#define AVATAR_URI_MAX_LEN 128
+static char avatar_uri_buffer[AVATAR_URI_MAX_LEN] = "/small";
+
+#define TOOT_ID_LEN 20
+static char toot_id[TOOT_ID_LEN];
+
+const char* get_last_avatar_uri() {
+    char* content_ptr;
+    int rsp_len = https_get("rebel-lion.uk", "/api/v1/timelines/public?limit=1", https_buffer, HTTPS_BUF_LEN, &content_ptr);
+    if (rsp_len <= 0) {
+        printf("Couldn't fetch latest toot\n");
+        return nullptr;
+    }
+    printf("Got JSON:\n%s\n", content_ptr);
+
+    std::string parse_err;
+    const auto json_rsp = json11::Json::parse(content_ptr, parse_err);
+    if (json_rsp.is_null()) {
+        printf("Failed to parse json: %s\n", parse_err.c_str());
+        return nullptr;
+    }
+
+    const auto& json_toot_id = json_rsp[0]["id"];
+    if (!json_toot_id.is_string()) {
+        printf("Failed to find toot id\n");
+        return nullptr;
+    }
+
+    const auto& toot_id_str = json_toot_id.string_value();
+    if (toot_id_str.length() >= TOOT_ID_LEN - 1) {
+        printf("Toot ID too long!\n");
+        return nullptr;
+    }
+    strcpy(toot_id, toot_id_str.c_str());
+
+    const auto& avatar_url = json_rsp[0]["account"]["avatar"];
+    if (!avatar_url.is_string()) {
+        printf("Failed to find avatar url\n");
+        return nullptr;
+    }
+
+    const auto& avatar_url_str = avatar_url.string_value();
+    if (avatar_url_str.length() > AVATAR_URI_MAX_LEN) {
+        printf("Avatar URI too long for buffer\n");
+        return nullptr;
+    }
+
+    size_t uri_start_idx = avatar_url_str.find('/', 8);
+    if (uri_start_idx == std::string::npos) {
+        printf("Failed to parse avatar url: %s\n", avatar_url_str.c_str());
+        return nullptr;
+    }
+
+    // Copy in after the /small prefix
+    strcpy(&avatar_uri_buffer[6], &avatar_url_str.c_str()[uri_start_idx]);
+    return avatar_uri_buffer;
+}
+
+void display_avatar(const char* avatar_uri) {
+    printf("Fetching avatar at: %s\n", avatar_uri);
+    char* content_ptr;
+    int rsp_len = https_get("rebel-lion.uk", avatar_uri, https_buffer, HTTPS_BUF_LEN, &content_ptr);
+    printf("https_get returned %d\n", rsp_len);
+    if (rsp_len > 0) {
+        printf("Received %d bytes.  Headers: \n%s\n", rsp_len, https_buffer);
+
+        int content_len = rsp_len - (content_ptr - https_buffer);
+        if (content_len > 0) {
+            printf("Decoding JPEG length %d\n", content_len);
+            jpegdec.openRAM((uint8_t*)content_ptr, content_len, &jpeg_draw_callback);
+            jpegdec.setPixelType(RGB565_BIG_ENDIAN);
+            jpegdec.decode(0, 0, 0);
+        }
+    }
+}
+
 int main() {
     stdio_init_all();
 
@@ -68,20 +145,18 @@ int main() {
         sleep_ms(10000);
     }
 
-    char* content_ptr;
-    int rsp_len = https_get("rebel-lion.uk", "/small/system/cache/accounts/avatars/109/449/728/322/785/203/original/2e5db4e6374a0202.jpg", https_buffer, HTTPS_BUF_LEN, &content_ptr);
-    printf("https_get returned %d\n", rsp_len);
-    if (rsp_len > 0) {
-        printf("Received %d bytes.  Headers: \n%s\n", rsp_len, https_buffer);
+    char last_toot_id[TOOT_ID_LEN] = "";
+    while (true) {
+        const char* avatar_uri = get_last_avatar_uri();
+        if (!avatar_uri) return 1;
 
-        int content_len = rsp_len - (content_ptr - https_buffer);
-        if (content_len > 0) {
-            printf("Decoding JPEG length %d\n", content_len);
-            jpegdec.openRAM((uint8_t*)content_ptr, content_len, &jpeg_draw_callback);
-            jpegdec.setPixelType(RGB565_BIG_ENDIAN);
-            jpegdec.decode(0, 0, 0);
+        if (strcmp(last_toot_id, toot_id)) {
+            strcpy(last_toot_id, toot_id);
+
+            display_avatar(avatar_uri);
         }
-    }
 
-    while (1);
+        sleep_ms(15000);
+    }
 }
+

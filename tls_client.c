@@ -78,7 +78,7 @@ static err_t tls_client_connected(void *arg, struct altcp_pcb *pcb, err_t err) {
     }
 
     printf("connected to server, sending request\n");
-    err = altcp_write(state->pcb, state->req, strlen(state->req), 0);
+    err = altcp_write(state->pcb, state->req, strlen(state->req), TCP_WRITE_FLAG_COPY);
     if (err != ERR_OK) {
         printf("error writing data, err=%d", err);
         return tls_client_close(state);
@@ -257,7 +257,8 @@ static bool dechunk(char* content_ptr, int* content_len) {
         content_ptr += chunk_len + 2;
     }
 
-    *content_len = content_ptr - 2 - original_start;
+    *content_len = move_to - original_start;
+    original_start[*content_len] = 0;
     return true;
 }
 
