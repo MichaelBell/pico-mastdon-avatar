@@ -16,8 +16,6 @@
                                  "\r\n"
 #define TLS_CLIENT_TIMEOUT_SECS  15
 
-#define TLS_CLIENT_HTTP_RESPONSE_MAX_LEN 16384
-
 typedef struct TLS_CLIENT_T_ {
     struct altcp_pcb *pcb;
     char* req;
@@ -107,9 +105,9 @@ static err_t tls_client_recv(void *arg, struct altcp_pcb *pcb, struct pbuf *p, e
     }
 
     int recv_len = p->tot_len;
-    if (recv_len + state->rsp_idx >= TLS_CLIENT_HTTP_RESPONSE_MAX_LEN) {
+    if (recv_len + state->rsp_idx >= state->rsp_buf_len) {
         printf("HTTPS response exceeded buffer length\n");
-        recv_len = TLS_CLIENT_HTTP_RESPONSE_MAX_LEN - state->rsp_idx - 1;
+        recv_len = state->rsp_buf_len - state->rsp_idx - 1;
     }
 
     if (p->tot_len > 0) {
@@ -270,6 +268,8 @@ static bool dechunk(char* content_ptr, int* content_len) {
 int https_get(const char* hostname, const char* uri, const char* headers, char* buffer, int buf_len, char** content_ptr) {
     /* No CA certificate checking */
     tls_config = altcp_tls_create_config_client(NULL, 0);
+
+    printf("Starting HTTPS get for %s\n", uri);
 
     TLS_CLIENT_T *state = tls_client_init();
     if (!state) {

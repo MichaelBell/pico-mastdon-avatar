@@ -11,7 +11,7 @@
 // This buffer is used for everything:
 // - HTTPS request/response building
 // - JSON parsing
-#define BUFFER_LEN 30000
+#define BUFFER_LEN 40000
 static char buffer[BUFFER_LEN];
 static char* alloc_ptr;
 
@@ -47,10 +47,15 @@ static void parse_account_json(MTOOT* toot, cJSON* account_json)
     }
 }
 
-bool get_latest_home_toot(MTOOT* toot)
+bool get_latest_home_toot(MTOOT* toot, const char* last_toot_id)
 {
     char* content_ptr;
-    int rsp_len = https_get(MASTODON_HOST, "/api/v1/timelines/home?limit=1", AUTH_HEADER, buffer, BUFFER_LEN, &content_ptr);
+    char req[128] = "/api/v1/timelines/home?limit=1";
+    if (last_toot_id) {
+        strcat(req, "&since_id=");
+        strcat(req, last_toot_id);
+    }
+    int rsp_len = https_get(MASTODON_HOST, req, AUTH_HEADER, buffer, BUFFER_LEN, &content_ptr);
     if (rsp_len <= 0) {
         printf("Couldn't fetch latest toot\n");
         return false;
@@ -73,6 +78,10 @@ bool get_latest_home_toot(MTOOT* toot)
     printf("Buffer used: %d/%d\n", alloc_ptr - buffer, BUFFER_LEN);
 
     cJSON* toot_json = cJSON_GetArrayItem(json, 0);
+    if (!toot_json) {
+        printf("No toot\n");
+        return false;
+    }
     
     cJSON* id_json = cJSON_GetObjectItemCaseSensitive(toot_json, "id");
     if (cJSON_IsString(id_json)) toot->id = id_json->valuestring;

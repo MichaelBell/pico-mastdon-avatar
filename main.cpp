@@ -61,7 +61,7 @@ void display_avatar(const uint8_t* avatar_jpeg, int jpeg_len, bool booster) {
             jpegdec.decode(0, 0, 0);
         }
         else {
-            jpegdec.decode(170, 170, JPEG_SCALE_QUARTER);
+            jpegdec.decode(162, 162, JPEG_SCALE_QUARTER);
         }
     }
 }
@@ -85,11 +85,13 @@ int main() {
     }
 
     char last_toot_id[TOOT_ID_LEN] = "";
+    const char* last_toot_id_ptr = NULL;
     MTOOT last_toot;
     while (true) {
-        if (get_latest_home_toot(&last_toot)) {
-            if (strcmp(last_toot_id, last_toot.id)) {
+        if (get_latest_home_toot(&last_toot, last_toot_id_ptr)) {
+            if (last_toot.id) {
                 strcpy(last_toot_id, last_toot.id);
+                last_toot_id_ptr = last_toot_id;
 
                 char booster_avatar_path[TOOT_AVATAR_PATH_LEN] = "";
                 if (last_toot.booster_avatar_path) strcpy(booster_avatar_path, last_toot.booster_avatar_path);

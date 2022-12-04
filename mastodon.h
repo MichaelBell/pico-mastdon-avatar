@@ -13,7 +13,9 @@ typedef struct mtoot_tag {
 } MTOOT;
 
 // Fetch the latest toot on the home timeline
-bool get_latest_home_toot(MTOOT* toot);
+// Returns true on success, false on failure
+// If last_toot_id is non-NULL returns false if there is no newer toot
+bool get_latest_home_toot(MTOOT* toot, const char* last_toot_id);
 
 // Get the image for an avatar.  This overwrites the buffer used for toots, but it
 // is safe to provide a pointer from a toot as the path.
