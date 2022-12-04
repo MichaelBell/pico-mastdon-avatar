@@ -48,7 +48,7 @@ jobs:
       with:
         repository: raspberrypi/pico-sdk
         path: pico-sdk
-        branch: develop
+        ref: develop
         submodules: true
 
     # Linux deps
